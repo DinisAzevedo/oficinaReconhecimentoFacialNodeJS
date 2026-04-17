@@ -1,482 +1,275 @@
-<!DOCTYPE html>
+<!doctype html>
 
 <html>
+  <head>
+    <meta charset="UTF-8" />
 
+    <title>Reconhecimento Facial Alunos</title>
 
-<head>
+    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js"></script>
 
+    <style>
+      body {
+        font-family: Arial;
 
-<meta charset="UTF-8">
+        text-align: center;
+      }
 
+      video {
+        border: 2px solid black;
+      }
 
-<title>Reconhecimento Facial Alunos</title>
+      canvas {
+        position: absolute;
+      }
+    </style>
+  </head>
 
+  <body>
+    <h2>Reconhecimento Facial + Emoções</h2>
 
-<script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js"></script>
+    <video id="video" width="720" height="560" autoplay muted></video>
 
+    <br /><br />
 
-<style>
+    <button onclick="capture()">Capturar Foto</button>
 
+    <script>
+      const video = document.getElementById("video");
 
-body {
+      let faceMatcher;
 
-  font-family: Arial;
+      // ============================
 
-  text-align: center;
+      // CARREGAR MODELOS
 
-}
+      // ============================
 
+      async function loadModels() {
+        await faceapi.nets.ssdMobilenetv1.loadFromUri("/models");
 
-video {
+        await faceapi.nets.faceLandmark68Net.loadFromUri("/models");
 
-  border: 2px solid black;
+        await faceapi.nets.faceRecognitionNet.loadFromUri("/models");
 
-}
+        await faceapi.nets.faceExpressionNet.loadFromUri("/models");
 
+        console.log("Modelos carregados");
+      }
 
-canvas {
+      // ============================
 
-  position: absolute;
+      // CARREGAR ALUNOS
 
-}
+      // ============================
 
+      async function loadStudents() {
+        const labels = ["dinisazevedo", "gabrielviana"];
 
-</style>
+        const loaded = await Promise.all(
+          labels.map(async (label) => {
+            const descriptions = [];
 
+            for (let i = 1; i <= 1; i++) {
+              try {
+                const img = await faceapi.fetchImage(
+                  `/students/${label}/${i}.jpg`,
+                );
 
-</head>
+                const detection = await faceapi
+                  .detectSingleFace(img)
+                  .withFaceLandmarks()
+                  .withFaceDescriptor();
 
+                if (detection) {
+                  descriptions.push(detection.descriptor);
+                }
+              } catch (_error) {
+                console.warn(`Imagem de treino não encontrada: /students/${label}/${i}.jpg`);
+              }
+            }
 
-<body>
+            if (descriptions.length === 0) {
+              return null;
+            }
 
+            return new faceapi.LabeledFaceDescriptors(
+              label,
 
-<h2>Reconhecimento Facial + Emoções</h2>
+              descriptions,
+            );
+          }),
+        );
 
+        return loaded.filter(Boolean);
+      }
 
-<video id="video"
+      // ============================
 
- width="720"
+      // CONFIGURAR RECONHECIMENTO
 
- height="560"
+      // ============================
 
- autoplay
+      async function setupRecognition() {
+        const labeledDescriptors = await loadStudents();
 
- muted>
+        if (labeledDescriptors.length === 0) {
+          faceMatcher = null;
+          console.warn("Sem imagens na base de conhecimento. Reconhecimento ficará como desconhecido.");
+          return;
+        }
 
-</video>
+        faceMatcher = new faceapi.FaceMatcher(
+          labeledDescriptors,
 
+          0.6,
+        );
 
-<br><br>
+        console.log("Reconhecimento pronto");
+      }
 
+      // ============================
 
-<button onclick="capture()">
+      // INICIAR WEBCAM
 
-Capturar Foto
+      // ============================
 
-</button>
+      async function startVideo() {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+        });
 
+        video.srcObject = stream;
+      }
 
-<script>
+      // ============================
 
+      // INICIALIZAÇÃO
 
-const video =
+      // ============================
 
- document.getElementById("video");
+      async function init() {
+        await loadModels();
 
+        await setupRecognition();
 
-let faceMatcher;
+        await startVideo();
+      }
 
+      init();
 
-// ============================
+      // ============================
 
-// CARREGAR MODELOS
+      // CAPTURAR FOTO
 
-// ============================
+      // ============================
 
+      async function capture() {
+        const detections = await faceapi
 
-async function loadModels() {
+          .detectAllFaces(video)
 
+          .withFaceLandmarks()
 
- await faceapi.nets.ssdMobilenetv1.loadFromUri('/models');
+          .withFaceExpressions()
 
+          .withFaceDescriptors();
 
- await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
+        if (detections.length === 0) {
+          alert("Nenhum rosto detectado");
 
+          return;
+        }
 
- await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
+        // ============================
 
+        // DETECTAR EMOÇÃO
 
- await faceapi.nets.faceExpressionNet.loadFromUri('/models');
+        // ============================
 
+        const expressions = detections[0].expressions;
 
- console.log("Modelos carregados");
+        let emotion = "neutral";
 
+        let max = 0;
 
-}
+        for (let key in expressions) {
+          if (expressions[key] > max) {
+            max = expressions[key];
 
+            emotion = key;
+          }
+        }
 
-// ============================
+        console.log("Emoção:", emotion);
 
-// CARREGAR ALUNOS
+        // ============================
 
-// ============================
+        // IDENTIFICAR ALUNO
 
+        // ============================
 
-async function loadStudents() {
+        let name = "desconhecido";
 
+        if (faceMatcher) {
+          const bestMatch = faceMatcher.findBestMatch(detections[0].descriptor);
+          name = bestMatch.label === "unknown" ? "desconhecido" : bestMatch.label;
+        }
 
- const labels = [
+        console.log("Aluno:", name);
 
-   "luissantos",
+        // ============================
 
-   "maria"
+        // CAPTURAR IMAGEM
 
- ];
+        // ============================
 
+        const snapshot = document.createElement("canvas");
 
- return Promise.all(
+        snapshot.width = video.width;
 
+        snapshot.height = video.height;
 
-  labels.map(async label => {
+        const ctx = snapshot.getContext("2d");
 
+        ctx.drawImage(
+          video,
 
-   const descriptions = [];
+          0,
 
+          0,
+        );
 
-   for (let i = 1; i <= 1; i++) {
+        snapshot.toBlob(async (blob) => {
+          const formData = new FormData();
 
+          formData.append(
+            "photo",
 
-    const img =
+            blob,
+          );
 
-      await faceapi.fetchImage(
+          formData.append(
+            "emotion",
 
-       `/students/${label}/${i}.jpg`
+            emotion,
+          );
 
-      );
+          formData.append(
+            "name",
 
+            name,
+          );
 
-    const detection =
+          await fetch("/upload", {
+            method: "POST",
 
-      await faceapi
+            body: formData,
+          });
 
-        .detectSingleFace(img)
-
-        .withFaceLandmarks()
-
-        .withFaceDescriptor();
-
-
-    descriptions.push(
-
-      detection.descriptor
-
-    );
-
-
-   }
-
-
-   return new faceapi
-
-     .LabeledFaceDescriptors(
-
-       label,
-
-       descriptions
-
-     );
-
-
-  })
-
-
- );
-
-
-}
-
-
-// ============================
-
-// CONFIGURAR RECONHECIMENTO
-
-// ============================
-
-
-async function setupRecognition() {
-
-
- const labeledDescriptors =
-
-   await loadStudents();
-
-
- faceMatcher =
-
-   new faceapi.FaceMatcher(
-
-     labeledDescriptors,
-
-     0.6
-
-   );
-
-
- console.log("Reconhecimento pronto");
-
-
-}
-
-
-// ============================
-
-// INICIAR WEBCAM
-
-// ============================
-
-
-async function startVideo() {
-
-
- const stream =
-
-   await navigator
-
-    .mediaDevices
-
-    .getUserMedia({ video: true });
-
-
- video.srcObject = stream;
-
-
-}
-
-
-// ============================
-
-// INICIALIZAÇÃO
-
-// ============================
-
-
-async function init() {
-
-
- await loadModels();
-
-
- await setupRecognition();
-
-
- await startVideo();
-
-
-}
-
-
-init();
-
-
-// ============================
-
-// CAPTURAR FOTO
-
-// ============================
-
-
-async function capture() {
-
-
- const detections =
-
-  await faceapi
-
-   .detectAllFaces(video)
-
-   .withFaceLandmarks()
-
-   .withFaceExpressions()
-
-   .withFaceDescriptors();
-
-
- if (detections.length === 0) {
-
-
-  alert("Nenhum rosto detectado");
-
-
-  return;
-
-
- }
-
-
- // ============================
-
- // DETECTAR EMOÇÃO
-
- // ============================
-
-
- const expressions =
-
-   detections[0].expressions;
-
-
- let emotion = "neutral";
-
-
- let max = 0;
-
-
- for (let key in expressions) {
-
-
-  if (expressions[key] > max) {
-
-
-   max = expressions[key];
-
-   emotion = key;
-
-
-  }
-
-
- }
-
-
- console.log("Emoção:", emotion);
-
-
- // ============================
-
- // IDENTIFICAR ALUNO
-
- // ============================
-
-
- const bestMatch =
-
-  faceMatcher
-
-   .findBestMatch(
-
-    detections[0].descriptor
-
-   );
-
-
- const name =
-
-  bestMatch.toString();
-
-
- console.log("Aluno:", name);
-
-
- // ============================
-
- // CAPTURAR IMAGEM
-
- // ============================
-
-
- const snapshot =
-
-   document.createElement("canvas");
-
-
- snapshot.width = video.width;
-
-
- snapshot.height = video.height;
-
-
- const ctx = snapshot.getContext("2d");
-
-
- ctx.drawImage(
-
-   video,
-
-   0,
-
-   0
-
- );
-
-
- snapshot.toBlob(
-
-  async (blob) => {
-
-
-   const formData =
-
-     new FormData();
-
-
-   formData.append(
-
-     "photo",
-
-     blob
-
-   );
-
-
-   formData.append(
-
-     "emotion",
-
-     emotion
-
-   );
-
-
-   formData.append(
-
-     "name",
-
-     name
-
-   );
-
-
-   await fetch("/upload", {
-
-
-    method: "POST",
-
-
-    body: formData
-
-
-   });
-
-
-   alert(
-
-    "Aluno: " + name +
-
-    "\nEmoção: " + emotion
-
-   );
-
-
- });
-
-
-}
-
-
-</script>
-
-
-</body>
-
-
+          alert("Aluno: " + name + "\nEmoção: " + emotion);
+        });
+      }
+    </script>
+  </body>
 </html>
