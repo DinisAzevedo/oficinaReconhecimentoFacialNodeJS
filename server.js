@@ -7,6 +7,9 @@ const app = express();
 app.use(cors());
 app.use(express.static("public"));
 
+// SERVIR MODELS (MUITO IMPORTANTE) PARA O ACESSO REFERENCIAL
+app.use('/models', express.static('models'));
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, "uploads/");
@@ -31,6 +34,7 @@ app.post("/upload", upload.single("photo"), (req, res) => {
   });
 });
 
+
 app.listen(3000, () => {
   console.log("Servidor a correr em http://localhost:3000");
-});
+}); 
