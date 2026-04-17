@@ -64,7 +64,7 @@
       // ============================
 
       async function loadStudents() {
-        const labels = ["dinisazevedo", "gabrielviana"];
+        const labels = ["luissantos", "maria"];
 
         const loaded = await Promise.all(
           labels.map(async (label) => {
@@ -85,7 +85,9 @@
                   descriptions.push(detection.descriptor);
                 }
               } catch (_error) {
-                console.warn(`Imagem de treino não encontrada: /students/${label}/${i}.jpg`);
+                console.warn(
+                  `Imagem de treino não encontrada: /students/${label}/${i}.jpg`,
+                );
               }
             }
 
@@ -115,7 +117,9 @@
 
         if (labeledDescriptors.length === 0) {
           faceMatcher = null;
-          console.warn("Sem imagens na base de conhecimento. Reconhecimento ficará como desconhecido.");
+          console.warn(
+            "Sem imagens na base de conhecimento. Reconhecimento ficará como desconhecido.",
+          );
           return;
         }
 
@@ -213,7 +217,8 @@
 
         if (faceMatcher) {
           const bestMatch = faceMatcher.findBestMatch(detections[0].descriptor);
-          name = bestMatch.label === "unknown" ? "desconhecido" : bestMatch.label;
+          name =
+            bestMatch.label === "unknown" ? "desconhecido" : bestMatch.label;
         }
 
         console.log("Aluno:", name);
